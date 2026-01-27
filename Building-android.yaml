@@ -1,134 +1,0 @@
-workflows:
-  simply-ai-android:
-    name: بناء Simply AI
-    description: بناء APK لتطبيق Simply AI مع Expo
-    
-    environment:
-      node: 18.19.0  # متوافق مع Expo 50
-      npm: 10.2.3
-    
-    scripts:
-      # المرحلة 1: الإعداد والتثبيت
-      - name: إعداد البيئة
-        script: |
-          echo "🚀 بدء بناء Simply AI v3.0.0"
-          echo "📱 Expo 50 | React Native 0.73"
-          echo "⏰ الوقت: $(date)"
-          pwd
-          ls -la
-      
-      - name: تثبيت الحزم
-        script: |
-          echo "📦 تثبيت حزم المشروع..."
-          npm install --legacy-peer-deps
-          echo "✅ تم التثبيت بنجاح"
-          
-          # تثبيت EAS CLI للبناء
-          npm install -g eas-cli@latest
-      
-      # المرحلة 2: البناء
-      - name: بناء APK
-        script: |
-          echo "🔨 جاري بناء APK..."
-          
-          # الطريقة 1: استخدام EAS Build (الأفضل)
-          echo "🔄 محاولة البناء عبر EAS..."
-          
-          # إذا كان هناك توكن، استخدم EAS
-          if [ -n "$EXPO_TOKEN" ]; then
-            echo "🔐 البناء باستخدام EAS Token..."
-            eas build --platform android --profile preview --non-interactive
-          else
-            # الطريقة 2: البناء المباشر
-            echo "⚙️ البناء المباشر..."
-            npx expo prebuild --platform android --clean
-            cd android
-            chmod +x gradlew
-            ./gradlew assembleDebug
-            echo "✅ تم البناء المباشر"
-          fi
-      
-      # المرحلة 3: التحضير للنشر
-      - name: إعداد النشر
-        script: |
-          echo "📤 تجهيز الملفات للنشر..."
-          
-          # البحث عن ملف APK
-          if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
-            APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
-          elif [ -f "app-debug.apk" ]; then
-            APK_PATH="app-debug.apk"
-          else
-            # البحث في أي مكان
-            APK_PATH=$(find . -name "*.apk" -type f | head -1)
-          fi
-          
-          if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
-            echo "🎯 تم العثور على APK: $APK_PATH"
-            echo "📊 حجم الملف: $(du -h "$APK_PATH" | cut -f1)"
-          else
-            echo "⚠️ لم يتم العثور على APK"
-          fi
-    
-    # الملفات الناتجة
-    artifacts:
-      - android/app/build/outputs/apk/debug/*.apk
-      - android/app/build/outputs/apk/debug/app-debug.apk
-      - build-*.apk
-      - *.apk
-    
-    # إعدادات النشر
-    publishing:
-      # إرسال إيميل
-      email:
-        recipients:
-          - maisabbas445@gmail.com
-        notify:
-          success: true
-          failure: true
-        subject: "✅ Simply AI Build ${CM_BUILD_NUMBER}"
-        body: |
-          تم بناء تطبيق Simply AI بنجاح!
-          
-          الإصدار: 3.0.0
-          Expo: 50.0.0
-          React Native: 0.73.0
-          
-          رابط التحميل: ${CM_ARTIFACT_LINKS}
-          
-          أو يمكنك:
-          1. تسجيل الدخول إلى Codemagic
-          2. الذهاب إلى Builds
-          3. اختيار هذا البناء
-          4. الضغط على Artifacts
-          5. تحميل الملف
-      
-      # إضافة متغيرات البيئة (اختياري)
-      environment:
-        groups:
-          - expo_variables  # يمكنك إنشاء هذه المجموعة لاحقاً
-
-# إعدادات التطبيق
-app_id: com.maisabbas.simplyai
-instance_type: mac_mini_m2  # لبناء أسرع
-
-# متى يتم البناء
-triggering:
-  events:
-    - push
-    - pull_request
-  branch_patterns:
-    - pattern: 'main'
-      include: true
-      source: true
-    - pattern: 'develop'
-      include: true
-      source: true
-
-# التخزين المؤقت لتسريع البناء القادم
-cache:
-  cache_paths:
-    - ~/.npm
-    - ~/.expo
-    - node_modules
-    - android/.gradle
