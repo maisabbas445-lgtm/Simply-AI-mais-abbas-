@@ -1,0 +1,136 @@
+workflows:
+  android-production:
+    name: بناء Simply AI للإنتاج
+    description: بناء APK نهائي لتطبيق Simply AI
+    
+    environment:
+      node: 18.19.0
+      npm: 10.2.3
+    
+    scripts:
+      # المرحلة 1: الإعداد
+      - name: إعداد المشروع
+        script: |
+          echo "🎯 بدء بناء Simply AI الإصدار 3.0.0"
+          echo "📅 التاريخ: $(date)"
+          echo "📁 الموقع: $(pwd)"
+          ls -la
+      
+      # المرحلة 2: تثبيت الحزم
+      - name: تثبيت التبعيات
+        script: |
+          echo "📦 جاري تثبيت الحزم..."
+          npm install --legacy-peer-deps
+          echo "✅ تم تثبيت جميع الحزم"
+          
+          # تثبيت Expo CLI إذا لزم
+          npm install -g expo-cli@latest
+      
+      # المرحلة 3: بناء Android
+      - name: بناء APK
+        script: |
+          echo "🔨 جاري بناء APK..."
+          
+          # إنشاء مجلدات Android (إذا لم تكن موجودة)
+          npx expo prebuild --platform android --clean
+          
+          # الانتقال إلى مجلد Android والبناء
+          cd android
+          
+          # منح صلاحيات لملف gradlew
+          chmod +x gradlew
+          
+          # بناء APK للتصحيح
+          ./gradlew assembleDebug
+          
+          echo "✅ تم بناء APK للتصحيح"
+          
+          # محاولة بناء إصدار (اختياري)
+          echo "⚡ محاولة بناء إصدار..."
+          ./gradlew assembleRelease || echo "⚠️ بناء الإصاخدور يحتاج توقيع"
+      
+      # المرحلة 4: التحضير النهائي
+      - name: التحضير للتوزيع
+        script: |
+          echo "📊 جمع المعلومات..."
+          
+          # البحث عن ملف APK
+          APK_PATH=""
+          
+          if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+            APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          elif [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+            APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+          else
+            # بحث شامل
+            APK_PATH=$(find . -name "*.apk" -type f | head -1)
+          fi
+          
+          if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
+            echo "🎯 تم العثور على APK: $APK_PATH"
+            echo "📦 الحجم: $(du -h "$APK_PATH" | cut -f1)"
+            echo "🔗 المسار النهائي: $APK_PATH"
+          else
+            echo "⚠️ لم يتم العثور على APK، قائمة الملفات:"
+            find . -name "*.apk" -type f
+          fi
+          
+          echo "🏁 عملية البناء اكتملت!"
+    
+    # الملفات الناتجة
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
+      - android/app/build/outputs/apk/debug/app-debug.apk
+      - app/build/outputs/apk/debug/*.apk
+      - build/**/*.apk
+      - "**/*.apk"
+    
+    # إعدادات النشر
+    publishing:
+      email:
+        recipients:
+          - maisabbas445@gmail.com
+        notify:
+          success: true
+          failure: true
+        subject: "🚀 Simply AI APK جاهزة - ${CM_BUILD_NUMBER}"
+        body: |
+          ✅ تم بناء تطبيق Simply AI بنجاح!
+          
+          📊 معلومات البناء:
+          - الإصدار: 3.0.0
+          - Expo: 50.0.0
+          - React Native: 0.73.0
+          - وقت البناء: ${CM_BUILD_CREATED_AT}
+          
+          📥 التحميل:
+          يمكنك تحميل APK من قسم Artifacts في Codemagic، أو استخدام الرابط:
+          ${CM_ARTIFACT_LINKS}
+          
+          ⚡ تعليمات سريعة:
+          1. ادخل إلى Codemagic
+          2. اضغط على هذا البناء
+          3. اختر علامة التبويب Artifacts
+          4. حمل ملف app-debug.apk
+      
+      # (اختياري) يمكنك إضافة Slack/Telegram لاحقاً
+
+# إعدادات إضافية
+app_id: com.maisabbas.simplyai
+instance_type: mac_mini_m2  # لبناء أسرع
+
+# محفزات البناء
+triggering:
+  events:
+    - push
+  branch_patterns:
+    - pattern: '*'
+      include: true
+  cancel_previous_builds: false
+
+# التخزين المؤقت
+cache:
+  cache_paths:
+    - ~/.npm
+    - node_modules
+    - android/.gradle
