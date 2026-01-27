@@ -1,36 +1,88 @@
 workflows:
-  simply-ai-android:
-    name: Simply AI Android
-    max_build_duration: 120
+  expo-android-apk:
+    name: Build Expo Android APK
     environment:
-      groups:
-        - env_vars
-      vars:
-        PACKAGE_NAME: "com.maisabbas.simplyai"
-      node: "18.17.0"
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: main
-          include: true
+      node: 18.17.0  # إصدار Node.js المناسب لـ Expo
+      npm: 9.6.7
     scripts:
-      - name: Install Dependencies
+      - name: Check project structure
         script: |
-          npm ci
-          
-      - name: Setup Environment
-        script: |
-          echo "EXPO_PUBLIC_OPENAI_KEY=$EXPO_PUBLIC_OPENAI_KEY" > .env
-          echo "EXPO_PUBLIC_NOWPAYMENTS_KEY=$EXPO_PUBLIC_NOWPAYMENTS_KEY" >> .env
-          
-      - name: Build Android APK
-        script: |
-          npx eas-cli build --platform android --non-interactive
-          
-    artifacts:
-      - build/**/*.apk
+          echo "📁 هيكل المشروع:"
+          ls -la
+          echo ""
+          echo "📦 package.json:"
+          cat package.json
+          echo ""
+          echo "📱 app.json:"
+          cat app.json
       
+      - name: Install dependencies
+        script: |
+          echo "📥 تثبيت Expo CLI و EAS CLI..."
+          npm install -g expo-cli@latest eas-cli@latest
+          echo "✅ تم تثبيت CLI"
+          
+          echo "📦 تثبيت حزم المشروع..."
+          npm ci --legacy-peer-deps
+          echo "✅ تم تثبيت جميع الحزم"
+      
+      - name: Setup Android
+        script: |
+          echo "🤖 إعداد Android..."
+          # إنشاء مجلدات Android إذا لم تكن موجودة
+          if [ ! -d "android" ]; then
+            echo "🔨 إنشاء مجلدات Android..."
+            npx expo prebuild --platform android
+          fi
+          
+          # نسخ ملفات التكوين إذا لزم الأمر
+          if [ -f ".env.example" ] && [ ! -f ".env" ]; then
+            cp .env.example .env
+            echo "📄 تم نسخ ملف البيئة"
+          fi
+      
+      - name: Build Android APK (Development)
+        script: |
+          echo "🔨 بناء APK للتنمية..."
+          cd android
+          ./gradlew assembleDebug
+          echo "✅ تم بناء APK للتنمية"
+      
+      - name: Build Android APK (Release)
+        script: |
+          echo "🚀 بناء APK للإصدار..."
+          cd android
+          ./gradlew assembleRelease
+          echo "🎉 تم بناء APK للإصدار بنجاح!"
+          
+          # عرض معلومات الملف
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+          if [ -f "$APK_PATH" ]; then
+            echo "📊 معلومات APK:"
+            ls -lh "$APK_PATH"
+            echo "📁 المسار: $APK_PATH"
+          else
+            echo "❌ لم يتم العثور على APK، جاري البحث..."
+            find . -name "*.apk" -type f
+          fi
+      
+      - name: Create download instructions
+        script: |
+          echo "⬇️ تعليمات التحميل:" > download_instructions.txt
+          echo "1. بعد انتهاء البناء، اضغط على علامة التبويب Artifacts" >> download_instructions.txt
+          echo "2. ابحث عن ملف app-release.apk" >> download_instructions.txt
+          echo "3. حمل الملف إلى جهازك" >> download_instructions.txt
+          echo "4. افتح الملف على جهاز Android للتثبيت" >> download_instructions.txt
+          echo "" >> download_instructions.txt
+          echo "📧 سيصلك رابط التحميل على: maisabbas445@gmail.com" >> download_instructions.txt
+    
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
+      - android/app/build/outputs/apk/release/*.apk
+      - download_instructions.txt
+      - build/**/*.apk
+      - *.apk
+    
     publishing:
       email:
         recipients:
@@ -38,3 +90,48 @@ workflows:
         notify:
           success: true
           failure: true
+        subject: "✅ بناء Simply AI تم بنجاح!"
+        body: |
+          تم بناء تطبيق Simply AI بنجاح!
+          
+          يمكنك تحميل APK من:
+          1. تسجيل الدخول إلى Codemagic
+          2. الذهاب إلى البناء الأخير
+          3. الضغط على علامة التabويب "Artifacts"
+          4. تحميل ملف app-release.apk
+          
+          أو انتظر دقيقة وسيصل الرابط المباشر في رسالة أخرى.
+      
+      scripts:
+        - name: Generate direct link
+          script: |
+            echo "🔗 جاري إنشاء رابط مباشر..."
+          only_if: "build.status == 'success'"
+
+# إعدادات المشروع
+project_directory: .  # المشروع في المجلد الحالي
+app_id: com.maisabbas.simplyai  # يمكنك تعديله
+
+# التخزين المؤقت
+cache:
+  cache_paths:
+    - ~/.npm
+    - ~/.expo
+    - node_modules
+    - android/.gradle
+
+# متى يتم البناء
+triggering:
+  events:
+    - push
+  branch_patterns:
+    - pattern: 'main'
+      include: true
+      source: true
+    - pattern: 'develop'
+      include: true
+      source: true
+  cancel_previous_builds: true
+
+# إعدادات الجهاز الظاهري
+instance_type: mac_mini_m2  # لبناء أسرع
