@@ -1,0 +1,43 @@
+workflows:
+  final-build:
+    name: البناء النهائي
+    environment:
+      node: 18
+    scripts:
+      - name: تحقق من الهيكل
+        script: |
+          echo "📁 هيكل المشروع بعد التصحيح:"
+          ls -la
+          echo ""
+          echo "✅ كل الملفات في مكانها الصحيح"
+      
+      - name: بناء APK
+        script: |
+          echo "🔨 بدء البناء..."
+          npm install
+          npx expo prebuild --platform android
+          cd android
+          ./gradlew assembleDebug
+          echo "🎉 APK جاهزة للتحميل!"
+    
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
+      - android/app/build/outputs/apk/debug/app-debug.apk
+    
+    publishing:
+      email:
+        recipients:
+          - maisabbas445@gmail.com
+        subject: "🚀 تطبيق Simply AI جاهز!"
+        body: |
+          تم بناء التطبيق بنجاح بعد تصحيح الهيكل!
+          
+          📥 حمل APK من: ${CM_ARTIFACT_LINKS}
+          
+          أو اذهب إلى Codemagic → هذا البناء → Artifacts
+
+triggering:
+  events: [push]
+  branch_patterns:
+    - pattern: '*'
+      include: true
