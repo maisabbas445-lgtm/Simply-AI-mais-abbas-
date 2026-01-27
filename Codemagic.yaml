@@ -1,0 +1,40 @@
+workflows:
+  simply-ai-android:
+    name: Simply AI Android
+    max_build_duration: 120
+    environment:
+      groups:
+        - env_vars
+      vars:
+        PACKAGE_NAME: "com.maisabbas.simplyai"
+      node: "18.17.0"
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+    scripts:
+      - name: Install Dependencies
+        script: |
+          npm ci
+          
+      - name: Setup Environment
+        script: |
+          echo "EXPO_PUBLIC_OPENAI_KEY=$EXPO_PUBLIC_OPENAI_KEY" > .env
+          echo "EXPO_PUBLIC_NOWPAYMENTS_KEY=$EXPO_PUBLIC_NOWPAYMENTS_KEY" >> .env
+          
+      - name: Build Android APK
+        script: |
+          npx eas-cli build --platform android --non-interactive
+          
+    artifacts:
+      - build/**/*.apk
+      
+    publishing:
+      email:
+        recipients:
+          - maisabbas445@gmail.com
+        notify:
+          success: true
+          failure: true
